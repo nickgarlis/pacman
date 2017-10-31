@@ -13,21 +13,25 @@
     <script src="//cdn.jsdelivr.net/phaser/2.2.2/phaser.min.js"></script>
 </head>
 <body>
-
+    <audio autoplay loop>
+        <source src="assets/009 Battle! (Wild Pokémon).mp3" type="audio/mpeg">
+    </audio>    
     <script type="text/javascript">
 
     var game = new Phaser.Game(448, 496, Phaser.AUTO);
 
+    var score =0;
+    var scoreText;    
     var Pacman = function (game) {
-
+        
         this.map = null;
         this.layer = null;
         this.pacman = null;
 
-        this.safetile = 14;
+        this.safetile = 189;
         this.gridsize = 16;
 
-        this.speed = 150;
+        this.speed = 100;
         this.threshold = 3;
 
         this.marker = new Phaser.Point();
@@ -59,48 +63,60 @@
 
             //  We need this because the assets are on github pages
             //  Remove the next 2 lines if running locally
-            this.load.baseURL = 'http://vparticles.com/pacman/';
-            this.load.crossOrigin = 'anonymous';
-
-            this.load.image('dot', 'assets/dot.png');
+            //this.load.baseURL = 'https://ioniodi.github.io/pacman/';
+            //this.load.crossOrigin = 'anonymous';
+            this.load.audio('foundpokeball', 'assets/Found A Pokeball - sound effect.wav');
+            this.load.image('pokeball', 'assets/pokeball.png');
+            this.load.image('masterball', 'assets/masterball.png');
             this.load.image('tiles', 'assets/pacman-tiles.png');
-            this.load.spritesheet('pacman', 'assets/pacman.png', 32, 32);
-            this.load.tilemap('map', 'assets/pacman-map.json', null, Phaser.Tilemap.TILED_JSON);
+            this.load.spritesheet('pacman', 'assets/character.png', 32, 32);
+            this.load.tilemap('map', 'assets/pokemonpacman-map.json', null, Phaser.Tilemap.TILED_JSON);
 
             //  Needless to say, graphics (C)opyright Namco
 
         },
 
         create: function () {
+            
+            EatPokeball = game.add.audio('foundpokeball');
 
             this.map = this.add.tilemap('map');
             this.map.addTilesetImage('pacman-tiles', 'tiles');
 
             this.layer = this.map.createLayer('Pacman');
 
-            this.dots = this.add.physicsGroup();
+            this.pokeballs = this.add.physicsGroup();
+            this.masterballs = this.add.physicsGroup();
 
-            this.map.createFromTiles(7, this.safetile, 'dot', this.layer, this.dots);
+            this.map.createFromTiles(2, this.safetile, 'pokeball', this.layer, this.pokeballs);
+            this.map.createFromTiles(3, this.safetile, 'masterball', this.layer, this.masterballs);
 
             //  The dots will need to be offset by 6px to put them back in the middle of the grid
-            this.dots.setAll('x', 6, false, false, 1);
-            this.dots.setAll('y', 6, false, false, 1);
+            this.pokeballs.setAll('x', 3, false, false, 1);
+            this.pokeballs.setAll('y', 6, false, false, 1);
+            //this.masterballs.setAll(Math.random());
+            this.masterballs.setAll('x', 3, false, false, 1);
+            this.masterballs.setAll('y', 6, false, false, 1);
 
             //  Pacman should collide with everything except the safe tile
-            this.map.setCollisionByExclusion([this.safetile], true, this.layer);
+            this.map.setCollisionByExclusion([189, 209, 210, 177, 194, 174, 191],  true, this.layer);
 
             //  Position Pacman at grid location 14x17 (the +8 accounts for his anchor)
             this.pacman = this.add.sprite((14 * 16) + 8, (17 * 16) + 8, 'pacman', 0);
             this.pacman.anchor.set(0.5);
-            this.pacman.animations.add('munch', [0, 1, 2, 1], 20, true);
-
+            this.pacman.animations.add('munchDOWN', [0, 1, 2, 3], 20, true);
+            this.pacman.animations.add('munchUP', [4, 5, 6, 7], 20, true);
+            this.pacman.animations.add('munchLR', [8, 9, 10, 11], 20, true);
             this.physics.arcade.enable(this.pacman);
             this.pacman.body.setSize(16, 16, 0, 0);
 
             this.cursors = this.input.keyboard.createCursorKeys();
-
-            this.pacman.play('munch');
+            this.pacman.play('munchLR');
             this.move(Phaser.LEFT);
+            
+            
+            this.timer = game.add.text(32, 2, "",{ fill: '#fff'});
+            scoreText = game.add.text(300, 2, 'Score: 0', { fill: '#fff' });
 
         },
 
@@ -204,27 +220,52 @@
             if (direction === Phaser.LEFT)
             {
                 this.pacman.scale.x = -1;
+                this.pacman.play('munchLR');
+            }
+            else if (direction === Phaser.RIGHT)
+            {
+                this.pacman.play('munchLR');
             }
             else if (direction === Phaser.UP)
             {
-                this.pacman.angle = 270;
+            //    this.pacman.angle = 270;
+                  this.pacman.play('munchUP');
             }
             else if (direction === Phaser.DOWN)
             {
-                this.pacman.angle = 90;
+            //    this.pacman.angle = 90;
+                  this.pacman.play('munchDOWN');
             }
 
             this.current = direction;
 
         },
+        
+        eatPokeball: function (pacman, pokeball) {
 
-        eatDot: function (pacman, dot) {
+            pokeball.kill();
+            
+            EatPokeball.play();
+            
+            score += 1;
+            scoreText.text = 'Score: ' + score;
 
-            dot.kill();
-
-            if (this.dots.total === 0)
+            if (this.pokeballs.total === 0)
             {
-                this.dots.callAll('revive');
+                this.pokeballs.callAll('revive');
+            }
+
+        },
+        eatMasterball: function (pacman, masterball) {
+
+            masterball.kill();
+            
+            score += 10;
+            scoreText.text = 'Score: ' + score;
+
+            if(this.masterballs.total === 0)
+            {
+                this.masterballs.callAll('revive');
             }
 
         },
@@ -232,7 +273,8 @@
         update: function () {
           
             this.physics.arcade.collide(this.pacman, this.layer);
-            this.physics.arcade.overlap(this.pacman, this.dots, this.eatDot, null, this);
+            this.physics.arcade.overlap(this.pacman, this.pokeballs, this.eatPokeball, null, this);
+            this.physics.arcade.overlap(this.pacman, this.masterballs, this.eatMasterball, null, this);
 
             this.marker.x = this.math.snapToFloor(Math.floor(this.pacman.x), this.gridsize) / this.gridsize;
             this.marker.y = this.math.snapToFloor(Math.floor(this.pacman.y), this.gridsize) / this.gridsize;
@@ -249,6 +291,12 @@
             {
                 this.turn();
             }
+
+        },
+        
+        render: function() {
+
+            this.timer.text = "Time: " + Math.floor(this.game.time.totalElapsedSeconds()) + "s";
 
         }
 
