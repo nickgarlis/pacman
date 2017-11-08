@@ -17,9 +17,9 @@
         <source src="assets/009 Battle! (Wild Pokémon).mp3" type="audio/mpeg">
     </audio>    
     <script type="text/javascript">
-
+    
     var game = new Phaser.Game(448, 496, Phaser.AUTO);
-
+    var rndpos;
     var score =0;
     var scoreText;    
     var Pacman = function (game) {
@@ -66,8 +66,10 @@
             //this.load.baseURL = 'https://ioniodi.github.io/pacman/';
             //this.load.crossOrigin = 'anonymous';
             this.load.audio('foundpokeball', 'assets/Found A Pokeball - sound effect.wav');
+            this.load.image('life', 'assets/life.png');
             this.load.image('pokeball', 'assets/pokeball.png');
             this.load.image('masterball', 'assets/masterball.png');
+            this.load.image('ultraball', 'assets/ultraball.png');
             this.load.image('tiles', 'assets/pacman-tiles.png');
             this.load.spritesheet('pacman', 'assets/character.png', 32, 32);
             this.load.tilemap('map', 'assets/pokemonpacman-map.json', null, Phaser.Tilemap.TILED_JSON);
@@ -86,17 +88,17 @@
             this.layer = this.map.createLayer('Pacman');
 
             this.pokeballs = this.add.physicsGroup();
-            this.masterballs = this.add.physicsGroup();
+            this.ultraballs = this.add.physicsGroup();
 
             this.map.createFromTiles(2, this.safetile, 'pokeball', this.layer, this.pokeballs);
-            this.map.createFromTiles(3, this.safetile, 'masterball', this.layer, this.masterballs);
+            this.map.createFromTiles(3, this.safetile, 'ultraball', this.layer, this.ultraballs);
 
             //  The dots will need to be offset by 6px to put them back in the middle of the grid
             this.pokeballs.setAll('x', 3, false, false, 1);
             this.pokeballs.setAll('y', 6, false, false, 1);
-            //this.masterballs.setAll(Math.random());
-            this.masterballs.setAll('x', 3, false, false, 1);
-            this.masterballs.setAll('y', 6, false, false, 1);
+            
+            this.ultraballs.setAll('x', 3, false, false, 1);
+            this.ultraballs.setAll('y', 6, false, false, 1);
 
             //  Pacman should collide with everything except the safe tile
             this.map.setCollisionByExclusion([189, 209, 210, 177, 194, 174, 191],  true, this.layer);
@@ -117,7 +119,16 @@
             
             this.timer = game.add.text(32, 2, "",{ fill: '#fff'});
             scoreText = game.add.text(300, 2, 'Score: 0', { fill: '#fff' });
+            this.life = this.add.sprite(150, 435, 'life');
+            this.life2 = this.add.sprite(190, 435, 'life');
+            this.life3 = this.add.sprite(230, 435, 'life');
+            game.add.text(70, 450, 'Lives:', {fill: '#fff'});
+            
+            let totalPokeballs = this.pokeballs.children.length;
+            rndpos = Math.floor(Math.random() * totalPokeballs);
+            this.pokeballs.children[rndpos].loadTexture('masterball');
 
+            
         },
 
         checkKeys: function () {
@@ -242,39 +253,44 @@
         },
         
         eatPokeball: function (pacman, pokeball) {
-
-            pokeball.kill();
+            const Masterball = this.pokeballs.getChildIndex(pokeball) == rndpos;
+            if(Masterball){
+                score += 20;
+                pokeball.kill();
+                let totalPokeballs = this.pokeballs.children.length;
+                rndpos = Math.floor(Math.random() * totalPokeballs);
+                this.pokeballs.children[rndpos].revive();
+                this.pokeballs.children[rndpos].loadTexture('masterball');
+             }
+            else{
+                pokeball.kill();
+                //score += 1;
+            }
             
             EatPokeball.play();
             
-            score += 1;
+            
             scoreText.text = 'Score: ' + score;
 
             if (this.pokeballs.total === 0)
             {
                 this.pokeballs.callAll('revive');
             }
-
-        },
-        eatMasterball: function (pacman, masterball) {
-
-            masterball.kill();
             
+        },
+        eatUltraball: function (pacman, ultraball) {
+            EatPokeball.play();
+            ultraball.kill();
             score += 10;
             scoreText.text = 'Score: ' + score;
-
-            if(this.masterballs.total === 0)
-            {
-                this.masterballs.callAll('revive');
-            }
-
+            
         },
-
-        update: function () {
+        
+        update: function (time) {
           
             this.physics.arcade.collide(this.pacman, this.layer);
             this.physics.arcade.overlap(this.pacman, this.pokeballs, this.eatPokeball, null, this);
-            this.physics.arcade.overlap(this.pacman, this.masterballs, this.eatMasterball, null, this);
+            this.physics.arcade.overlap(this.pacman, this.ultraballs, this.eatUltraball, null, this);
 
             this.marker.x = this.math.snapToFloor(Math.floor(this.pacman.x), this.gridsize) / this.gridsize;
             this.marker.y = this.math.snapToFloor(Math.floor(this.pacman.y), this.gridsize) / this.gridsize;
@@ -291,6 +307,7 @@
             {
                 this.turn();
             }
+            
 
         },
         
