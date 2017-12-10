@@ -132,9 +132,19 @@
             this.physics.arcade.enable(this.zigzagoon1);
             this.zigzagoon1.body.setSize(16, 16, 0, 0);
             this.zigzagoon1.play('munchLR');
+            this.zigzagoon2 = this.add.sprite((19 * 16) + 8, (9 * 16) + 8, 'zigzagoon', 0);
+            this.zigzagoon2.anchor.set(0.5);
+            this.zigzagoon2.animations.add('munchDOWN', [0, 1, 2, 3], 20, true);
+            this.zigzagoon2.animations.add('munchUP', [4, 5, 6, 7], 20, true);
+            this.zigzagoon2.animations.add('munchLR', [8, 9, 10, 11], 20, true);
+            this.physics.arcade.enable(this.zigzagoon2);
+            this.zigzagoon2.body.setSize(16, 16, 0, 0);
+            this.zigzagoon2.play('munchLR');
+            
             this.spawnPokemon();
             this.move(Phaser.LEFT);
             this.movePokemon(Phaser.LEFT, this.zigzagoon1);
+            this.movePokemon(Phaser.LEFT, this.zigzagoon2);
             this.timer = game.add.text(32, 2, "",{ fill: '#fff'});
             scoreText = game.add.text(300, 2, 'Score: 0', { fill: '#fff' });
             game.add.text(70, 450, 'Lives:', {fill: '#fff'});
@@ -441,10 +451,12 @@
             }
             this.physics.arcade.collide(this.pacman, this.layer);
             this.physics.arcade.collide(this.zigzagoon1, this.layer, this.escapeCollision(this.zigzagoon1), null, this);
+            this.physics.arcade.collide(this.zigzagoon2, this.layer, this.escapeCollision(this.zigzagoon2), null, this);
             this.physics.arcade.collide(this.shellow, this.layer, this.escapeCollision(this.shellow), null, this);
             this.physics.arcade.overlap(this.pacman, this.pokeballs, this.eatPokeball, null, this);
             this.physics.arcade.overlap(this.pacman, this.ultraballs, this.eatUltraball, null, this);
             this.physics.arcade.overlap(this.zigzagoon1, this.pacman, this.killpacman, null, this);
+            this.physics.arcade.overlap(this.zigzagoon2, this.pacman, this.killpacman, null, this);
             this.physics.arcade.overlap(this.pacman, this.teleport1, this.teleport, null, this);
 
             this.marker.x = this.math.snapToFloor(Math.floor(this.pacman.x), this.gridsize) / this.gridsize;
