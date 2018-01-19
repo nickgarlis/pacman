@@ -14,16 +14,18 @@
 </head>
 <body>
     <audio autoplay="autoplay" loop="loop">
-        <source src="assets/009 Battle! (Wild Pokémon).mp3" type="audio/mp3">
+        <source src="assets/Pokemon-theme.mp3" type="audio/mp3">
     </audio>
     <script type="text/javascript">
 
     var game = new Phaser.Game(448, 496, Phaser.AUTO);
+    var Pbutton;
     var rndpos;
     var score =0;
     var scoreText;
     var lives = 3;
-    var f = null;
+    var chase = null;
+    var Spawn = true;
     var lifepos = 150;
     var Pacman = function (game) {
 
@@ -76,6 +78,7 @@
             this.load.image('masterball', 'assets/masterball.png');
             this.load.image('ultraball', 'assets/ultraball.png');
             this.load.image('tiles', 'assets/pacman-tiles.png');
+            this.load.spritesheet('continue', 'assets/continue.png');
             this.load.spritesheet('pacman', 'assets/character.png', 32, 32);
             this.load.spritesheet('zigzagoon', 'assets/zigzagoon.png', 32, 32);
             this.load.spritesheet('shellow', 'assets/shellow.png', 32, 32);
@@ -121,6 +124,7 @@
             this.pacman.body.setSize(16, 16, 0, 0);
 
             this.cursors = this.input.keyboard.createCursorKeys();
+            Pbutton = this.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
             this.pacman.play('munchLR');
 
 
@@ -140,8 +144,7 @@
             this.physics.arcade.enable(this.zigzagoon2);
             this.zigzagoon2.body.setSize(16, 16, 0, 0);
             this.zigzagoon2.play('munchLR');
-            
-            this.spawnPokemon();
+           
             this.move(Phaser.LEFT);
             this.movePokemon(Phaser.LEFT, this.zigzagoon1);
             this.movePokemon(Phaser.LEFT, this.zigzagoon2);
@@ -188,6 +191,12 @@
             {
                 //  This forces them to hold the key down to turn the corner
                 this.turning = Phaser.NONE;
+            }
+            if (this.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR).isDown && Spawn == true){
+              if (score>50){
+                score=score-50;              
+                this.spawnPokemon();
+              }  
             }
 
         },
@@ -328,14 +337,31 @@
           }
         },
 
-
+        actionOnClick: function() {
+            location.href = "level2.html";
+        },
 
         eatPokeball: function (pacman, pokeball) {
+            const Masterball = this.pokeballs.getChildIndex(pokeball) == rndpos;
+            if(Masterball){
+                score += 20;
+                pokeball.kill();
+                let totalPokeballs = this.pokeballs.children.length;
+                rndpos = Math.floor(Math.random() * totalPokeballs);
+                this.pokeballs.children[rndpos].revive();
+                this.pokeballs.children[rndpos].loadTexture('masterball');
+             }
+            else{
+                score += 1;
+                pokeball.kill();
+            }
+            if(this.pokeballs.total===1){
+                this.youwin = game.add.text(180, 224, 'You Win', {fill: '#fff'});
+                this.button = game.add.button((10 * 16), (18 * 16), 'continue', this.actionOnClick, this, 2, 1, 0);
+                this.speed=0;
+            }
             EatPokeball.play();
-            pokeball.kill();
-            score += 1;
-            scoreText.text = 'Score: ' + score;
-
+            scoreText.text = 'Score: ' + score;  
         },
 
         eatUltraball: function (pacman, ultraball) {
@@ -369,20 +395,23 @@
         },
 
         killpacman: function (){
-          if(lives==3){
+          if(this.shellow){
+            this.shellow.kill();
+          }
+          Spawn=true;
+          lives= lives -1;
+          if(lives==2){
+              alert("You have lost a life");
               this.life3.visible=false;
           }
-          else if (lives == 2){
-              this.life2.visible=false;
-          }
           else if (lives == 1){
-              this.life1.visible=false;
+              alert("You have lost another life");
+              this.life2.visible=false;
           }
           else {
             this.pacman.kill();
             alert("Game Over");
           }
-          lives= lives -1;
           this.pacman.position.x = (14 * 16) + 8;
           this.pacman.position.y = (17 * 16) + 8;
           this.zigzagoon1.position.x = (17 * 16) + 8;
@@ -397,16 +426,17 @@
         },
 
         spawnPokemon: function (){
-          this.shellow = this.add.sprite((25 * 16) + 8, (25 * 16) + 8, 'shellow', 0);
-          this.shellow.anchor.set(0.5);
-          this.shellow.animations.add('munchDOWN', [0, 1, 2, 3], 20, true);
-          this.shellow.animations.add('munchUP', [4, 5, 6, 7], 20, true);
-          this.shellow.animations.add('munchLR', [8, 9, 10, 11], 20, true);
-          this.physics.arcade.enable(this.shellow);
-          this.shellow.body.setSize(16, 16, 0, 0);
-          this.shellow.play('munchLR');
-          f=true;
-
+              Spawn = false;
+              this.shellow = this.add.sprite(this.pacman.position.x , this.pacman.position.y, 'shellow', 0);
+              this.shellow.anchor.set(0.5);
+              this.shellow.animations.add('munchDOWN', [0, 1, 2, 3], 20, true);
+              this.shellow.animations.add('munchUP', [4, 5, 6, 7], 20, true);
+              this.shellow.animations.add('munchLR', [8, 9, 10, 11], 20, true);
+              this.physics.arcade.enable(this.shellow);
+              this.shellow.body.setSize(16, 16, 0, 0);
+              this.shellow.play('munchLR');
+              chase=true;
+        
         },
 
         chasePokemon: function(pokemon1, pokemon2){
@@ -439,15 +469,21 @@
             if (this.physics.arcade.collide(pokemon1, pokemon2)){
               pokemon1.kill();
               this.movePokemon(Phaser.UP, pokemon2);
-              f = false;
+              chase = false;
               return;
             }
         },
 
 
         update: function (time) {
-            if ( f == true ){
-              this.chasePokemon(this.zigzagoon1, this.shellow);
+            /*if(score>10){
+              this.spawnPokemon();
+              score=score-10;
+            }*/
+            if ( chase == true ){
+              if (this.zigzagoon1){
+                this.chasePokemon(this.zigzagoon1, this.shellow);
+              }
             }
             this.physics.arcade.collide(this.pacman, this.layer);
             this.physics.arcade.collide(this.zigzagoon1, this.layer, this.escapeCollision(this.zigzagoon1), null, this);

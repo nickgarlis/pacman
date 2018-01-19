@@ -1,0 +1,520 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Pacman</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+        }
+    </style>
+    <script src="//cdn.jsdelivr.net/phaser/2.2.2/phaser.min.js"></script>
+</head>
+<body>
+    <audio autoplay="autoplay" loop="loop">
+        <source src="assets/Pokemon-theme.mp3" type="audio/mp3">
+    </audio>
+    <script type="text/javascript">
+
+    var game = new Phaser.Game(448, 496, Phaser.AUTO);
+    var Pbutton;
+    var rndpos;
+    var score =0;
+    var scoreText;
+    var lives = 3;
+    var chase = null;
+    var Spawn = true;
+    var lifepos = 150;
+    var Pacman = function (game) {
+
+        this.map = null;
+        this.layer = null;
+        this.pacman = null;
+        this.zigzagoon = null;
+
+        this.safetile = 189;
+        this.gridsize = 16;
+
+        this.speed = 100;
+        this.threshold = 3;
+
+        this.marker = new Phaser.Point();
+        this.turnPoint = new Phaser.Point();
+
+        this.directions = [ null, null, null, null, null ];
+        this.opposites = [ Phaser.NONE, Phaser.RIGHT, Phaser.LEFT, Phaser.DOWN, Phaser.UP ];
+
+        this.current = Phaser.NONE;
+        this.pcurrent = Phaser.NONE;
+        this.turning = Phaser.NONE;
+
+    };
+
+    Pacman.prototype = {
+
+        init: function () {
+
+            this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+            this.scale.pageAlignHorizontally = true;
+            this.scale.pageAlignVertically = true;
+
+            Phaser.Canvas.setImageRenderingCrisp(this.game.canvas);
+
+            this.physics.startSystem(Phaser.Physics.ARCADE);
+
+        },
+
+        preload: function () {
+
+            //  We need this because the assets are on github pages
+            //  Remove the next 2 lines if running locally
+            //this.load.baseURL = 'http://vparticles.com/pacman/';
+            //this.load.crossOrigin = 'anonymous';
+            this.load.audio('foundpokeball', 'assets/Found A Pokeball - sound effect.wav');
+            this.load.image('life', 'assets/life.png');
+            this.load.image('pokeball', 'assets/pokeball.png');
+            this.load.image('masterball', 'assets/masterball.png');
+            this.load.image('ultraball', 'assets/ultraball.png');
+            this.load.image('tiles', 'assets/pacman-tiles.png');
+            this.load.spritesheet('continue', 'assets/continue.png');
+            this.load.spritesheet('pacman', 'assets/character.png', 32, 32);
+            this.load.spritesheet('zigzagoon', 'assets/zigzagoon.png', 32, 32);
+            this.load.spritesheet('shellow', 'assets/shellow.png', 32, 32);
+            this.load.spritesheet('teleport', 'assets/teleport.png', 16, 16);
+            this.load.tilemap('map', 'assets/pokemonpacman-map2.json', null, Phaser.Tilemap.TILED_JSON);
+
+            //  Needless to say, graphics (C)opyright Nintendo
+
+        },
+
+        create: function () {
+
+            EatPokeball = game.add.audio('foundpokeball');
+
+            this.map = this.add.tilemap('map');
+            this.map.addTilesetImage('pacman-tiles', 'tiles');
+
+            this.layer = this.map.createLayer('Pacman');
+
+            this.pokeballs = this.add.physicsGroup();
+            this.ultraballs = this.add.physicsGroup();
+
+            this.map.createFromTiles(2, this.safetile, 'pokeball', this.layer, this.pokeballs);
+            this.map.createFromTiles(3, this.safetile, 'ultraball', this.layer, this.ultraballs);
+
+            //  The dots will need to be offset by 6px to put them back in the middle of the grid
+            this.pokeballs.setAll('x', 3, false, false, 1);
+            this.pokeballs.setAll('y', 6, false, false, 1);
+
+            this.ultraballs.setAll('x', 3, false, false, 1);
+            this.ultraballs.setAll('y', 6, false, false, 1);
+
+            //  Pacman should collide with everything except the safe tile
+            this.map.setCollisionByExclusion([189, 209, 210, 177, 194, 174, 191, 172],  true, this.layer);
+
+            //  Position Pacman at grid location 14x17 (the +8 accounts for his anchor)
+            this.pacman = this.add.sprite((14 * 16) + 8, (17 * 16) + 8, 'pacman', 0);
+            this.pacman.anchor.set(0.5);
+            this.pacman.animations.add('munchDOWN', [0, 1, 2, 3], 20, true);
+            this.pacman.animations.add('munchUP', [4, 5, 6, 7], 20, true);
+            this.pacman.animations.add('munchLR', [8, 9, 10, 11], 20, true);
+            this.physics.arcade.enable(this.pacman);
+            this.pacman.body.setSize(16, 16, 0, 0);
+
+            this.cursors = this.input.keyboard.createCursorKeys();
+            Pbutton = this.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+            this.pacman.play('munchLR');
+
+
+            this.zigzagoon1 = this.add.sprite((17 * 16) + 8, (17 * 16) + 8, 'zigzagoon', 0);
+            this.zigzagoon1.anchor.set(0.5);
+            this.zigzagoon1.animations.add('munchDOWN', [0, 1, 2, 3], 20, true);
+            this.zigzagoon1.animations.add('munchUP', [4, 5, 6, 7], 20, true);
+            this.zigzagoon1.animations.add('munchLR', [8, 9, 10, 11], 20, true);
+            this.physics.arcade.enable(this.zigzagoon1);
+            this.zigzagoon1.body.setSize(16, 16, 0, 0);
+            this.zigzagoon1.play('munchLR');
+            this.zigzagoon2 = this.add.sprite((19 * 16) + 8, (9 * 16) + 8, 'zigzagoon', 0);
+            this.zigzagoon2.anchor.set(0.5);
+            this.zigzagoon2.animations.add('munchDOWN', [0, 1, 2, 3], 20, true);
+            this.zigzagoon2.animations.add('munchUP', [4, 5, 6, 7], 20, true);
+            this.zigzagoon2.animations.add('munchLR', [8, 9, 10, 11], 20, true);
+            this.physics.arcade.enable(this.zigzagoon2);
+            this.zigzagoon2.body.setSize(16, 16, 0, 0);
+            this.zigzagoon2.play('munchLR');
+           
+            this.move(Phaser.LEFT);
+            this.movePokemon(Phaser.LEFT, this.zigzagoon1);
+            this.movePokemon(Phaser.LEFT, this.zigzagoon2);
+            this.timer = game.add.text(32, 2, "",{ fill: '#fff'});
+            scoreText = game.add.text(300, 2, 'Score: 0', { fill: '#fff' });
+            game.add.text(70, 450, 'Lives:', {fill: '#fff'});
+            this.life1 = this.add.sprite(150, 435, 'life');
+            this.life2 = this.add.sprite(190, 435, 'life');
+            this.life3 = this.add.sprite(230, 435, 'life');
+
+            let totalPokeballs = this.pokeballs.children.length;
+            rndpos = Math.floor(Math.random() * totalPokeballs);
+            this.pokeballs.children[rndpos].loadTexture('masterball');
+
+        },
+
+
+        checkKeys: function () {
+
+            if (this.cursors.left.isDown && this.current !== Phaser.LEFT)
+            {
+                this.checkDirection(Phaser.LEFT);
+            }
+            else if (this.cursors.right.isDown && this.current !== Phaser.RIGHT)
+            {
+                this.checkDirection(Phaser.RIGHT);
+            }
+            else if (this.cursors.up.isDown && this.current !== Phaser.UP)
+            {
+                this.checkDirection(Phaser.UP);
+            }
+            else if (this.cursors.down.isDown && this.current !== Phaser.DOWN)
+            {
+                this.checkDirection(Phaser.DOWN);
+            }
+            else
+            {
+                //  This forces them to hold the key down to turn the corner
+                this.turning = Phaser.NONE;
+            }
+            if (this.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR).isDown && Spawn == true){
+              if (score>50){
+                score=score-50;              
+                this.spawnPokemon();
+              }  
+            }
+
+        },
+
+        checkDirection: function (turnTo) {
+
+            if (this.turning === turnTo || this.directions[turnTo] === null || this.directions[turnTo].index !== this.safetile)
+            {
+                //  Invalid direction if they're already set to turn that way
+                //  Or there is no tile there, or the tile isn't index 1 (a floor tile)
+                return;
+            }
+
+            //  Check if they want to turn around and can
+            if (this.current === this.opposites[turnTo])
+            {
+                this.move(turnTo);
+            }
+            else
+            {
+                this.turning = turnTo;
+
+                this.turnPoint.x = (this.marker.x * this.gridsize) + (this.gridsize / 2);
+                this.turnPoint.y = (this.marker.y * this.gridsize) + (this.gridsize / 2);
+            }
+
+        },
+
+        turn: function () {
+
+            var cx = Math.floor(this.pacman.x);
+            var cy = Math.floor(this.pacman.y);
+
+            //  This needs a threshold, because at high speeds you can't turn because the coordinates skip past
+            if (!this.math.fuzzyEqual(cx, this.turnPoint.x, this.threshold) || !this.math.fuzzyEqual(cy, this.turnPoint.y, this.threshold))
+            {
+                return false;
+            }
+
+            //  Grid align before turning
+            this.pacman.x = this.turnPoint.x;
+            this.pacman.y = this.turnPoint.y;
+
+            this.pacman.body.reset(this.turnPoint.x, this.turnPoint.y);
+
+            this.move(this.turning);
+
+            this.turning = Phaser.NONE;
+
+            return true;
+
+        },
+
+        move: function (direction) {
+
+            var speed = this.speed;
+
+            if (direction === Phaser.LEFT || direction === Phaser.UP)
+            {
+                speed = -speed;
+            }
+
+            if (direction === Phaser.LEFT || direction === Phaser.RIGHT)
+            {
+                this.pacman.body.velocity.x = speed;
+            }
+            else
+            {
+                this.pacman.body.velocity.y = speed;
+            }
+
+            //  Reset the scale and angle (Pacman is facing to the right in the sprite sheet)
+            this.pacman.scale.x = 1;
+            this.pacman.angle = 0;
+
+            if (direction === Phaser.LEFT)
+            {
+                this.pacman.scale.x = -1;
+                this.pacman.play('munchLR');
+            }
+            else if (direction === Phaser.RIGHT)
+            {
+                this.pacman.play('munchLR');
+            }
+            else if (direction === Phaser.UP)
+            {
+            //    this.pacman.angle = 270;
+                  this.pacman.play('munchUP');
+            }
+            else if (direction === Phaser.DOWN)
+            {
+            //    this.pacman.angle = 90;
+                  this.pacman.play('munchDOWN');
+            }
+
+            this.current = direction;
+
+        },
+
+        movePokemon: function(pokemonDirection, pokemon){
+          var PokemonSpeed = this.speed;
+
+          if (pokemonDirection === Phaser.LEFT || pokemonDirection === Phaser.UP)
+          {
+              PokemonSpeed = -PokemonSpeed;
+          }
+
+          if (pokemonDirection === Phaser.LEFT || pokemonDirection === Phaser.RIGHT)
+          {
+              pokemon.body.velocity.x = PokemonSpeed;
+          }
+          else
+          {
+              pokemon.body.velocity.y = PokemonSpeed;
+          }
+
+          pokemon.scale.x = 1;
+          pokemon.angle = 0;
+
+          if (pokemonDirection === Phaser.LEFT)
+          {
+              pokemon.scale.x = -1;
+              pokemon.play('munchLR');
+          }
+          else if (pokemonDirection === Phaser.RIGHT)
+          {
+              pokemon.play('munchLR');
+          }
+          else if (pokemonDirection === Phaser.UP)
+          {
+          //    this.pacman.angle = 270;
+                pokemon.play('munchUP');
+          }
+          else if (pokemonDirection === Phaser.DOWN)
+          {
+          //    this.pacman.angle = 90;
+                pokemon.play('munchDOWN');
+          }
+        },
+        
+        actionOnClick: function() {
+            location.href = "index.html";
+        },
+
+        eatPokeball: function (pacman, pokeball) {
+            const Masterball = this.pokeballs.getChildIndex(pokeball) == rndpos;
+            if(Masterball){
+                score += 20;
+                pokeball.kill();
+                let totalPokeballs = this.pokeballs.children.length;
+                rndpos = Math.floor(Math.random() * totalPokeballs);
+                this.pokeballs.children[rndpos].revive();
+                this.pokeballs.children[rndpos].loadTexture('masterball');
+             }
+            else{
+                score += 1;
+                pokeball.kill();
+            }
+            if(this.pokeballs.total===1){
+                this.youwin = game.add.text(180, 224, 'You Win', {fill: '#fff'});
+                this.button = game.add.button((10 * 16), (18 * 16), 'continue', this.actionOnClick, this, 2, 1, 0);
+                this.speed=0;
+            }
+            EatPokeball.play();
+            scoreText.text = 'Score: ' + score;  
+        },
+
+        eatUltraball: function (pacman, ultraball) {
+            EatPokeball.play();
+            ultraball.kill();
+            score += 10;
+            scoreText.text = 'Score: ' + score;
+
+        },
+
+        escapeCollision: function (pokemon){
+          if (this.physics.arcade.collide(pokemon, this.layer)){
+              rnd = Math.floor((Math.random() * 4) + 1);
+              if(rnd== 1)
+              {
+                this.movePokemon(Phaser.UP, pokemon);
+              }
+              else if(rnd == 2)
+              {
+                this.movePokemon(Phaser.DOWN, pokemon);
+              }
+              else if(rnd == 3)
+              {
+                this.movePokemon(Phaser.LEFT, pokemon);
+              }
+              else
+              {
+                this.movePokemon(Phaser.RIGHT, pokemon);
+              }
+            }
+        },
+
+        killpacman: function (){
+          if(this.shellow){
+            this.shellow.kill();
+          }
+          Spawn=true;
+          lives= lives -1;
+          if(lives==2){
+              alert("You have lost a life");
+              this.life3.visible=false;
+          }
+          else if (lives == 1){
+              alert("You have lost another life");
+              this.life2.visible=false;
+          }
+          else {
+            this.life1.visible=false;
+            this.pacman.kill();
+            alert("Game Over");
+          }
+          this.pacman.position.x = (14 * 16) + 8;
+          this.pacman.position.y = (17 * 16) + 8;
+          this.zigzagoon1.position.x = (17 * 16) + 8;
+          this.zigzagoon1.position.y = (17 * 16) + 8;
+        },
+
+        teleport: function (t){
+          if (this.pacman.position.x = (3*16)+8){
+            this.pacman.position.x = (3 * 16) + 8;
+            this.pacman.position.y = (17 * 16) + 8;
+          }
+        },
+
+        spawnPokemon: function (){
+              Spawn = false;
+              this.shellow = this.add.sprite(this.pacman.position.x , this.pacman.position.y, 'shellow', 0);
+              this.shellow.anchor.set(0.5);
+              this.shellow.animations.add('munchDOWN', [0, 1, 2, 3], 20, true);
+              this.shellow.animations.add('munchUP', [4, 5, 6, 7], 20, true);
+              this.shellow.animations.add('munchLR', [8, 9, 10, 11], 20, true);
+              this.physics.arcade.enable(this.shellow);
+              this.shellow.body.setSize(16, 16, 0, 0);
+              this.shellow.play('munchLR');
+              chase=true;
+        
+        },
+
+        chasePokemon: function(pokemon1, pokemon2){
+          var pathx = pokemon2.position.x - pokemon1.position.x;
+            if(pathx<0){
+              this.movePokemon(Phaser.RIGHT, pokemon2);
+              if(pokemon2.position.y==pokemon1.position.y){
+                if(pathy<0){
+                  var pathy = pokemon2.position.y - pokemon1.position.y;
+                  this.movePokemon(Phaser.UP, pokemon2);
+                }
+                else{
+                  this.movePokemon(Phaser.DOWN, pokemon2);
+                }
+              }
+            }
+            else if(pathx>0){
+              this.movePokemon(Phaser.LEFT, pokemon2);
+              if (pokemon2.position.y==pokemon1.position.y){
+                var pathy = pokemon2.position.y - pokemon1.position.y;
+                if(pathy<0){
+                  this.movePokemon(Phaser.UP, pokemon2);
+                }
+                else{
+                  this.movePokemon(Phaser.DOWN, pokemon2);
+                }
+              }
+            }
+
+            if (this.physics.arcade.collide(pokemon1, pokemon2)){
+              pokemon1.kill();
+              this.movePokemon(Phaser.UP, pokemon2);
+              chase = false;
+              return;
+            }
+        },
+
+
+        update: function (time) {
+            if ( chase == true ){
+              if (this.zigzagoon1){
+                this.chasePokemon(this.zigzagoon1, this.shellow);
+              }
+            }
+            this.physics.arcade.collide(this.pacman, this.layer);
+            this.physics.arcade.collide(this.zigzagoon1, this.layer, this.escapeCollision(this.zigzagoon1), null, this);
+            this.physics.arcade.collide(this.zigzagoon2, this.layer, this.escapeCollision(this.zigzagoon2), null, this);
+            this.physics.arcade.collide(this.shellow, this.layer, this.escapeCollision(this.shellow), null, this);
+            this.physics.arcade.overlap(this.pacman, this.pokeballs, this.eatPokeball, null, this);
+            this.physics.arcade.overlap(this.pacman, this.ultraballs, this.eatUltraball, null, this);
+            this.physics.arcade.overlap(this.zigzagoon1, this.pacman, this.killpacman, null, this);
+            this.physics.arcade.overlap(this.zigzagoon2, this.pacman, this.killpacman, null, this);
+            this.physics.arcade.overlap(this.pacman, this.teleport1, this.teleport, null, this);
+
+            this.marker.x = this.math.snapToFloor(Math.floor(this.pacman.x), this.gridsize) / this.gridsize;
+            this.marker.y = this.math.snapToFloor(Math.floor(this.pacman.y), this.gridsize) / this.gridsize;
+
+            //  Update our grid sensors
+            this.directions[1] = this.map.getTileLeft(this.layer.index, this.marker.x, this.marker.y);
+            this.directions[2] = this.map.getTileRight(this.layer.index, this.marker.x, this.marker.y);
+            this.directions[3] = this.map.getTileAbove(this.layer.index, this.marker.x, this.marker.y);
+            this.directions[4] = this.map.getTileBelow(this.layer.index, this.marker.x, this.marker.y);
+
+            this.checkKeys();
+
+            if (this.turning !== Phaser.NONE)
+            {
+                this.turn();
+            }
+
+
+        },
+
+        render: function() {
+
+            this.timer.text = "Time: " + Math.floor(this.game.time.totalElapsedSeconds()) + "s";
+
+        }
+
+    };
+
+    game.state.add('Game', Pacman, true);
+
+    </script>
+
+</body>
+</html>
